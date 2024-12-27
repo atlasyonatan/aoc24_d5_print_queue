@@ -1,5 +1,6 @@
 use itertools::Itertools;
 use std::{
+    cmp::Ordering,
     collections::{HashMap, HashSet},
     hash::Hash,
     io::{self, Read},
@@ -31,12 +32,26 @@ fn main() {
             .map(|s| s.parse::<u64>().unwrap())
             .collect::<Vec<_>>()
     });
-    let result: u64 = updates
-        .filter(|update| is_in_correct_order(&update, &page_ordering_rules))
-        .map(|update| *update.get(update.len().div_euclid(2)).unwrap())
+    let (ordered_correct, ordered_incorrect): (Vec<_>, Vec<_>) =
+        updates.partition(|update| is_in_correct_order(&update, &page_ordering_rules));
+
+    let result: u64 = ordered_correct
+        .into_iter()
+        .map(|update| *middle(&update).unwrap())
         .sum();
 
     println!("part 1: {}", result);
+
+    let result: u64 = ordered_incorrect
+        .into_iter()
+        .map(|mut update| {
+            order_correctly(&mut update, &page_ordering_rules);
+            update
+        })
+        .map(|update| *middle(&update).unwrap())
+        .sum();
+
+    println!("part 2: {}", result);
 }
 
 fn is_in_correct_order<T>(update: &[T], rules: &HashMap<T, HashSet<T>>) -> bool
@@ -59,4 +74,31 @@ where
     }
 
     return true;
+}
+
+fn middle<T>(slice: &[T]) -> Option<&T> {
+    slice.get(slice.len().div_euclid(2))
+}
+
+fn order_correctly<T>(update: &mut [T], rules: &HashMap<T, HashSet<T>>)
+where
+    T: Eq + Hash + Copy,
+{
+    update.sort_by(|p1, p2| {
+        if rules
+            .get(p1)
+            .is_some_and(|must_come_before| must_come_before.contains(p2))
+        {
+            return Ordering::Greater;
+        }
+
+        if rules
+            .get(p2)
+            .is_some_and(|must_come_before| must_come_before.contains(p1))
+        {
+            return Ordering::Less;
+        }
+
+        unreachable!()
+    });
 }
